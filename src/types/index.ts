@@ -405,3 +405,37 @@ export interface CodeAnalysisResult {
   matchedTodos: ProgressAnalysisResult[];
   suggestions: string[];
 }
+
+// ============================================
+// SSE 스트리밍 관련 타입
+// ============================================
+
+export type DocumentStatus = 'pending' | 'generating' | 'completed' | 'error';
+
+export interface DocumentState {
+  key: keyof CoreDocuments;
+  status: DocumentStatus;
+  content?: string;
+  error?: string;
+}
+
+export type StreamEventType = 'start' | 'progress' | 'document' | 'error' | 'complete';
+
+export interface StreamEvent {
+  type: StreamEventType;
+  documentKey?: keyof CoreDocuments;
+  step?: number;
+  totalSteps?: number;
+  content?: string;
+  error?: string;
+  documents?: CoreDocuments;
+  todos?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    phase: string;
+    status: 'pending';
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    estimatedHours: number;
+  }>;
+}

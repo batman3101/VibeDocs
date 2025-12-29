@@ -11,7 +11,12 @@
       "Bash(dir:*)",
       "Bash(git init:*)",
       "Bash(git remote add:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: VibeDocs - AI 기반 프로젝트 문서 자동 생성 도구\n\n주요 기능:\n- 프로젝트 아이디어 기반 10종 문서 자동 생성 \\(PRD, API Spec, Data Model 등\\)\n- 멀티 AI 프로바이더 지원 \\(Google Gemini, OpenAI, Anthropic Claude\\)\n- 바이브 코딩 가이드 \\(GitHub, Supabase 데이터베이스 사용법 포함\\)\n- 프로젝트 대시보드 및 TODO 관리\n- 기능 확장 문서 생성\n- 다크/라이트 테마 지원\n\n기술 스택:\n- Next.js 16 + React 19\n- TypeScript\n- Tailwind CSS + shadcn/ui\n- Zustand \\(상태 관리\\)\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\ndocs: README 개발자용 설치 가이드 업데이트\n\n변경 내용:\n- Quick Start 섹션 추가 \\(5분 안에 실행하기\\)\n- Node.js 설치 가이드 \\(Windows/Mac\\)\n- GitHub URL 수정 \\(batman3101/VibeDocs\\)\n- 멀티 AI 프로바이더 지원 문서화 \\(Google, OpenAI, Anthropic\\)\n- API 키 발급 가이드 추가\n- 문제 해결\\(Troubleshooting\\) 섹션 추가\n- 기술 스택 업데이트 \\(Next.js 16, Tailwind 4.x\\)\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ]
   }
 }

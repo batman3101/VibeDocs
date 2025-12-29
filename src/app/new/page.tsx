@@ -6,7 +6,7 @@ import { ArrowLeft, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IdeaForm, GenerationProgress } from '@/components/project';
 import { DocumentPreview } from '@/components/document';
-import { useProjectStore, useApiKey } from '@/stores';
+import { useProjectStore, useApiKey, useAIProvider } from '@/stores';
 import type { AppType, TemplateType, CoreDocuments, TodoItem } from '@/types';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -25,6 +25,7 @@ export default function NewProjectPage() {
   const router = useRouter();
   const { createProject } = useProjectStore();
   const { apiKey, hasApiKey } = useApiKey();
+  const { aiProvider, aiModel } = useAIProvider();
 
   const [currentStep, setCurrentStep] = useState<Step>('input');
   const [projectData, setProjectData] = useState<{
@@ -35,101 +36,32 @@ export default function NewProjectPage() {
   } | null>(null);
   const [generatedDocs, setGeneratedDocs] = useState<CoreDocuments | null>(null);
   const [generatedTodos, setGeneratedTodos] = useState<TodoItem[]>([]);
-  const [generationError, setGenerationError] = useState<string | null>(null);
 
   const handleIdeaSubmit = async (idea: string, appType: AppType, template?: TemplateType, projectName?: string) => {
     if (!hasApiKey || !apiKey) {
       toast.error('API 키가 필요합니다', {
-        description: '헤더의 API 설정에서 Google AI API 키를 입력해주세요.',
+        description: '헤더의 API 설정에서 API 키를 입력해주세요.',
       });
       return;
     }
 
     setProjectData({ idea, appType, template, projectName });
     setCurrentStep('generating');
-    setGenerationError(null);
-
-    try {
-      // Call the document generation API
-      const response = await fetch('/api/generate-documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          apiKey,
-          idea,
-          appType,
-          template,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || '문서 생성에 실패했습니다');
-      }
-
-      // Set generated documents
-      const docs: CoreDocuments = {
-        ideaBrief: data.documents.ideaBrief || '',
-        userStories: data.documents.userStories || '',
-        screenFlow: data.documents.screenFlow || '',
-        prd: data.documents.prd || '',
-        techStack: data.documents.techStack || '',
-        dataModel: data.documents.dataModel || '',
-        apiSpec: data.documents.apiSpec || '',
-        testScenarios: data.documents.testScenarios || '',
-        todoMaster: data.documents.todoMaster || '',
-        promptGuide: data.documents.promptGuide || '',
-      };
-
-      setGeneratedDocs(docs);
-
-      // Set generated TODOs
-      if (data.todos && Array.isArray(data.todos)) {
-        const todos: TodoItem[] = data.todos.map((t: {
-          id: string;
-          title: string;
-          description: string;
-          phase: string;
-          status: string;
-          priority: string;
-          estimatedHours: number;
-        }) => ({
-          ...t,
-          source: 'core' as const,
-          status: 'pending' as const,
-          statusUpdatedBy: 'manual' as const,
-          dependencies: [],
-          prompt: `${t.title}을(를) 구현해주세요.`,
-          testCriteria: [`${t.title}이(가) 정상 작동하는지 확인`],
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }));
-        setGeneratedTodos(todos);
-      }
-
-      if (data.warnings && data.warnings.length > 0) {
-        toast.warning('일부 문서 생성에 문제가 있었습니다', {
-          description: '자세한 내용은 콘솔을 확인해주세요.',
-        });
-        console.warn('Document generation warnings:', data.warnings);
-      }
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-      setGenerationError(errorMessage);
-      toast.error('문서 생성 실패', {
-        description: errorMessage,
-        duration: 5000,
-      });
-      setCurrentStep('input');
-    }
   };
 
-  const handleGenerationComplete = useCallback(() => {
+  const handleGenerationComplete = useCallback((docs: CoreDocuments, todos: TodoItem[]) => {
+    setGeneratedDocs(docs);
+    setGeneratedTodos(todos);
     setCurrentStep('preview');
+    toast.success('문서 생성이 완료되었습니다');
+  }, []);
+
+  const handleGenerationError = useCallback((error: string) => {
+    toast.error('문서 생성 실패', {
+      description: error,
+      duration: 5000,
+    });
+    setCurrentStep('input');
   }, []);
 
   const handleDownloadAll = async () => {
@@ -229,8 +161,17 @@ export default function NewProjectPage() {
           <IdeaForm onSubmit={handleIdeaSubmit} />
         )}
 
-        {currentStep === 'generating' && (
-          <GenerationProgress onComplete={handleGenerationComplete} />
+        {currentStep === 'generating' && projectData && apiKey && (
+          <GenerationProgress
+            apiKey={apiKey}
+            idea={projectData.idea}
+            appType={projectData.appType}
+            template={projectData.template}
+            provider={aiProvider}
+            model={aiModel}
+            onComplete={handleGenerationComplete}
+            onError={handleGenerationError}
+          />
         )}
 
         {currentStep === 'preview' && generatedDocs && (
