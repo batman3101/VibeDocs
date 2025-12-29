@@ -2,5 +2,14 @@
   command = "npm run build"
   publish = ".next"
 
+[functions]
+  # 함수 타임아웃 26초로 설정 (무료 티어 최대)
+  external_node_modules = ["@google/generative-ai", "openai", "@anthropic-ai/sdk"]
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# API 라우트 타임아웃 설정
+[functions."api/*"]
+  # Netlify Pro는 26초, 무료는 10초 제한
+  # 긴 작업은 클라이언트 사이드에서 처리하는 것이 좋음
