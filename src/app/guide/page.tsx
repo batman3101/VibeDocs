@@ -647,7 +647,7 @@ function WorkflowSection() {
 
           <div className="p-4 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-3">
-              <Image className="h-5 w-5 text-green-500" alt="" />
+              <Image className="h-5 w-5 text-green-500" />
               <p className="font-semibold">이미지로 추출</p>
             </div>
             <p className="text-sm text-muted-foreground">
