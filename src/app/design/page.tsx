@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   ArrowLeft,
   Globe,
@@ -503,9 +504,11 @@ export default function DesignPage() {
                 ) : (
                   <div className="space-y-4">
                     <div className="relative rounded-lg border overflow-hidden bg-muted/30">
-                      <img
+                      <Image
                         src={uploadedImage.preview}
                         alt="업로드된 스크린샷"
+                        width={800}
+                        height={300}
                         className="w-full max-h-[300px] object-contain"
                       />
                       <Button

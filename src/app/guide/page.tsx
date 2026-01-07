@@ -27,12 +27,8 @@ import {
   Monitor,
   Keyboard,
   MousePointer,
-  Search,
   Package,
-  Puzzle,
   Play,
-  Square,
-  CircleDot,
   Zap,
   Key,
   Palette,
@@ -42,25 +38,18 @@ import {
   PenTool,
   Image,
   Globe,
-  Cpu,
   Bot,
   Coins,
   Star,
   HelpCircle,
   Home,
-  ArrowDown,
-  MousePointer2,
-  Upload,
-  FileDown,
   Route,
   Github,
-  GitBranch,
   GitCommit,
   CloudUpload,
   History,
   Users,
   Shield,
-  Copy,
   FolderGit2,
   Database,
   Table2,
@@ -658,7 +647,7 @@ function WorkflowSection() {
 
           <div className="p-4 rounded-xl border bg-card">
             <div className="flex items-center gap-2 mb-3">
-              <Image className="h-5 w-5 text-green-500" />
+              <Image className="h-5 w-5 text-green-500" alt="" />
               <p className="font-semibold">이미지로 추출</p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -1876,7 +1865,7 @@ function TipsSection() {
           💡 예시 제공하기
         </h4>
         <div className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-sm leading-loose">
-          <p className="text-green-400">// 구체적인 예시와 함께 요청</p>
+          <p className="text-green-400">{`// 구체적인 예시와 함께 요청`}</p>
           <p className="mt-3">카드 컴포넌트를 만들어주세요.</p>
           <p className="mt-3 text-cyan-400">예시:</p>
           <p className="text-yellow-300">• 이미지, 제목, 설명, 가격 표시</p>
@@ -1892,7 +1881,7 @@ function TipsSection() {
           📋 출력 형식 지정하기
         </h4>
         <div className="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-sm leading-loose">
-          <p className="text-green-400">// 원하는 형식을 명확히</p>
+          <p className="text-green-400">{`// 원하는 형식을 명확히`}</p>
           <p className="mt-3 text-yellow-300">TypeScript 인터페이스로 작성해주세요.</p>
           <p className="text-yellow-300">주석도 추가해주세요.</p>
           <p className="text-yellow-300">파일 경로: src/types/user.ts</p>

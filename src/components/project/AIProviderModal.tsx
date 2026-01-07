@@ -34,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAIProvider } from '@/stores';
 import { validateApiKey, quickValidateApiKeyFormat } from '@/lib/ai-client';
 import { toast } from 'sonner';
-import type { AIProvider as AIProviderType, AIModel } from '@/types/ai-providers';
+import type { AIProvider as AIProviderType } from '@/types/ai-providers';
 import { AI_PROVIDERS, getProviderConfig, getModelById } from '@/types/ai-providers';
 
 interface AIProviderModalProps {
@@ -48,7 +48,6 @@ export function AIProviderModal({ trigger, open, onOpenChange }: AIProviderModal
     aiProvider,
     aiModel,
     apiKeys,
-    hasApiKey,
     isApiKeyValid,
     setAIProvider,
     setAIModel,

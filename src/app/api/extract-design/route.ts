@@ -114,7 +114,6 @@ export async function POST(request: NextRequest) {
 
     // Extract design elements
     const extractedData = await page.evaluate(() => {
-      const colors: Map<string, number> = new Map();
       const fontFamilies: Map<string, number> = new Map();
       const fontSizes: Map<string, number> = new Map();
       const bgColors: Map<string, number> = new Map();

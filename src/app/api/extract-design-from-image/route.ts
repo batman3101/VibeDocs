@@ -187,16 +187,7 @@ function isLight(hex: string): boolean {
   return luminance > 0.5;
 }
 
-function getSaturation(hex: string): number {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return 0;
-  const { r, g, b } = rgb;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2 / 255;
-  if (max === min) return 0;
-  return max - min / (1 - Math.abs(2 * l - 1)) / 255;
-}
+
 
 function buildColorPalette(
   lightColors: string[],

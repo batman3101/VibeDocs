@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import {
   CheckCircle,
-  Circle,
   ExternalLink,
   Rocket,
   Shield,

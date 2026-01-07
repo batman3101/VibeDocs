@@ -98,7 +98,7 @@ export default function WorkflowPage() {
         });
       }
     }
-  }, [project]);
+  }, [project, steps, toggleChecklistItem]);
 
   const handleStepClick = (stepId: WorkflowStepId) => {
     if (canProceedToStep(stepId)) {

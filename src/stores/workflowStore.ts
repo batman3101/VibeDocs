@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { WorkflowStep, WorkflowStepId, WorkflowChecklistItem, DeploymentCategory } from '@/types';
+import type { WorkflowStep, WorkflowStepId, DeploymentCategory } from '@/types';
 import { DEFAULT_WORKFLOW_STEPS, DEPLOYMENT_CHECKLIST } from '@/constants/workflow';
 
 // ============================================
