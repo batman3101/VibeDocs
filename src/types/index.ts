@@ -291,6 +291,7 @@ export const STORAGE_KEYS = {
   API_KEY: 'vibedocs-api-key',
   SETTINGS: 'vibedocs-settings',
   WORKFLOW: 'vibedocs-workflow',
+  PARTIAL_GENERATION: 'vibedocs-partial-generation',
 } as const;
 
 // ============================================
@@ -417,6 +418,39 @@ export interface DocumentState {
   status: DocumentStatus;
   content?: string;
   error?: string;
+  retryCount?: number;
+}
+
+// ============================================
+// 부분 생성 상태 (중간 저장용)
+// ============================================
+
+export interface PartialGenerationState {
+  projectId: string;
+  idea: string;
+  appType: AppType;
+  template?: TemplateType;
+  provider?: string;
+  model?: string;
+  completedDocs: Partial<CoreDocuments>;
+  failedDocs: (keyof CoreDocuments)[];
+  pendingDocs: (keyof CoreDocuments)[];
+  lastUpdated: Date;
+}
+
+// ============================================
+// 재생성 요청 타입
+// ============================================
+
+export interface RegenerateRequest {
+  apiKey: string;
+  idea: string;
+  appType: string;
+  template?: string;
+  provider?: string;
+  model?: string;
+  documentKeys: (keyof CoreDocuments)[];  // 재생성할 문서 키 목록
+  existingDocs?: Partial<CoreDocuments>;  // 이미 생성된 문서
 }
 
 export type StreamEventType = 'start' | 'progress' | 'document' | 'error' | 'complete';
@@ -428,6 +462,8 @@ export interface StreamEvent {
   totalSteps?: number;
   content?: string;
   error?: string;
+  retryCount?: number;       // 재시도 횟수
+  maxRetries?: number;       // 최대 재시도 횟수
   documents?: CoreDocuments;
   todos?: Array<{
     id: string;

@@ -3,9 +3,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import type { AIProvider } from '@/types/ai-providers';
-import type { CoreDocuments, StreamEvent } from '@/types';
+import type { CoreDocuments, StreamEvent, RegenerateRequest } from '@/types';
 
-// Document system prompts
+// Document system prompts (동일한 프롬프트 사용)
 const DOCUMENT_PROMPTS: Record<string, string> = {
   ideaBrief: `당신은 프로젝트 기획 전문가입니다.
 사용자의 아이디어를 분석하여 IDEA_BRIEF.md 문서를 작성해주세요.
@@ -76,33 +76,9 @@ RESTful API 명세를 마크다운으로 작성해주세요.
 - AI 도구별 팁`,
 };
 
-const DOCUMENT_ORDER: (keyof CoreDocuments)[] = [
-  'ideaBrief',
-  'userStories',
-  'screenFlow',
-  'prd',
-  'techStack',
-  'dataModel',
-  'apiSpec',
-  'testScenarios',
-  'todoMaster',
-  'promptGuide',
-];
-
-interface GenerateRequest {
-  apiKey: string;
-  idea: string;
-  appType: string;
-  template?: string;
-  provider?: AIProvider;
-  model?: string;
-  skipDocuments?: (keyof CoreDocuments)[];  // 건너뛸 문서 목록 (이미 생성된 문서)
-}
-
 // 설정 상수
 const MAX_RETRIES = 3;
 const TIMEOUT_MS = 90000; // 90초
-const BASE_DELAY_MS = 500; // 기본 딜레이
 
 // Generate content using the appropriate AI provider
 async function generateWithProvider(
@@ -207,112 +183,24 @@ async function generateWithRetry(
       lastError = error instanceof Error ? error : new Error(String(error));
       const errorMsg = lastError.message;
 
-      console.log(`[Retry] Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+      console.log(`[Regenerate] Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
 
       if (onRetry) {
         onRetry(attempt, errorMsg);
       }
 
-      // 마지막 시도가 아니면 대기 후 재시도
       if (attempt < maxRetries) {
-        // 지수 백오프: 2초, 4초, 8초...
         const delay = Math.pow(2, attempt) * 1000;
-
-        // Rate limit 에러면 더 오래 대기
         const isRateLimit = errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('rate');
         const actualDelay = isRateLimit ? delay * 2 : delay;
 
-        console.log(`[Retry] Waiting ${actualDelay / 1000}s before retry...`);
+        console.log(`[Regenerate] Waiting ${actualDelay / 1000}s before retry...`);
         await new Promise(resolve => setTimeout(resolve, actualDelay));
       }
     }
   }
 
-  throw lastError || new Error('문서 생성 실패');
-}
-
-// Parse TODO items from the todoMaster markdown
-function parseTodosFromMaster(todoMasterContent: string): Array<{
-  id: string;
-  title: string;
-  description: string;
-  phase: string;
-  status: 'pending';
-  priority: 'critical' | 'high' | 'medium' | 'low';
-  estimatedHours: number;
-}> {
-  const todos: Array<{
-    id: string;
-    title: string;
-    description: string;
-    phase: string;
-    status: 'pending';
-    priority: 'critical' | 'high' | 'medium' | 'low';
-    estimatedHours: number;
-  }> = [];
-
-  const lines = todoMasterContent.split('\n');
-  let currentPhase = '';
-  let todoId = 1;
-
-  for (const line of lines) {
-    if (line.startsWith('## ') || line.startsWith('### ')) {
-      const phaseMatch = line.match(/#+\s*(Phase\s*\d+[:\s]*.+)/i);
-      if (phaseMatch) {
-        currentPhase = phaseMatch[1].trim();
-      }
-    }
-
-    const todoMatch = line.match(/^[-*]\s*\[[ x]\]\s*(.+)/i);
-    if (todoMatch && currentPhase) {
-      const title = todoMatch[1].trim();
-      const hoursMatch = title.match(/\((\d+(?:\.\d+)?)\s*(?:시간|h|hr|hours?)\)/i);
-      const estimatedHours = hoursMatch ? parseFloat(hoursMatch[1]) : 2;
-
-      let priority: 'critical' | 'high' | 'medium' | 'low' = 'medium';
-      if (title.toLowerCase().includes('critical') || currentPhase.toLowerCase().includes('phase 1')) {
-        priority = 'critical';
-      } else if (title.toLowerCase().includes('high') || currentPhase.toLowerCase().includes('phase 2')) {
-        priority = 'high';
-      } else if (title.toLowerCase().includes('low')) {
-        priority = 'low';
-      }
-
-      todos.push({
-        id: `TODO-${String(todoId++).padStart(3, '0')}`,
-        title: title.replace(/\(.*?\)/g, '').trim(),
-        description: `${currentPhase}: ${title}`,
-        phase: currentPhase,
-        status: 'pending',
-        priority,
-        estimatedHours,
-      });
-    }
-  }
-
-  if (todos.length === 0) {
-    const defaultPhases = [
-      { name: 'Phase 1: 프로젝트 설정', items: ['프로젝트 초기화', '기본 설정', '의존성 설치'] },
-      { name: 'Phase 2: 핵심 기능', items: ['메인 기능 구현', 'UI 개발', 'API 연동'] },
-      { name: 'Phase 3: 테스트 및 배포', items: ['테스트 작성', '버그 수정', '배포'] },
-    ];
-
-    defaultPhases.forEach(phase => {
-      phase.items.forEach(item => {
-        todos.push({
-          id: `TODO-${String(todoId++).padStart(3, '0')}`,
-          title: item,
-          description: `${phase.name}: ${item}`,
-          phase: phase.name,
-          status: 'pending',
-          priority: phase.name.includes('1') ? 'critical' : 'high',
-          estimatedHours: 2,
-        });
-      });
-    });
-  }
-
-  return todos;
+  throw lastError || new Error('문서 재생성 실패');
 }
 
 // Send SSE event
@@ -327,7 +215,7 @@ function sendEvent(
 
 export async function POST(request: NextRequest) {
   try {
-    const body: GenerateRequest = await request.json();
+    const body: RegenerateRequest = await request.json();
     const {
       apiKey,
       idea,
@@ -335,12 +223,13 @@ export async function POST(request: NextRequest) {
       template,
       provider = 'google',
       model = 'gemini-2.5-flash',
-      skipDocuments = []
+      documentKeys,
+      existingDocs = {}
     } = body;
 
-    if (!apiKey || !idea || !appType) {
+    if (!apiKey || !idea || !appType || !documentKeys || documentKeys.length === 0) {
       return new Response(
-        JSON.stringify({ error: 'API key, idea, and appType are required' }),
+        JSON.stringify({ error: 'API key, idea, appType, and documentKeys are required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -358,17 +247,11 @@ ${templateInfo}
 마크다운 형식으로만 응답해주세요 (코드 블록 없이).
 `;
 
-    // 건너뛸 문서를 제외한 생성 대상 문서 목록
-    const documentsToGenerate = DOCUMENT_ORDER.filter(
-      docKey => !skipDocuments.includes(docKey)
-    );
-
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        const documents: Partial<CoreDocuments> = {};
-        const totalSteps = DOCUMENT_ORDER.length;
-        const skippedCount = skipDocuments.length;
+        const documents: Partial<CoreDocuments> = { ...existingDocs };
+        const totalSteps = documentKeys.length;
 
         // Send start event
         sendEvent(controller, encoder, {
@@ -376,25 +259,10 @@ ${templateInfo}
           totalSteps,
         });
 
-        // 전체 문서 순서대로 처리 (스킵된 문서 포함)
-        for (let i = 0; i < DOCUMENT_ORDER.length; i++) {
-          const docKey = DOCUMENT_ORDER[i];
+        for (let i = 0; i < documentKeys.length; i++) {
+          const docKey = documentKeys[i];
 
-          // 건너뛸 문서인 경우
-          if (skipDocuments.includes(docKey)) {
-            console.log(`[Stream] Skipping ${docKey} (already generated)`);
-            // 스킵된 문서는 완료 상태로 바로 전송
-            sendEvent(controller, encoder, {
-              type: 'document',
-              documentKey: docKey,
-              content: '', // 프론트엔드에서 기존 콘텐츠 사용
-              step: i + 1,
-              totalSteps,
-            });
-            continue;
-          }
-
-          // Send progress event (starting this document)
+          // Send progress event
           sendEvent(controller, encoder, {
             type: 'progress',
             documentKey: docKey,
@@ -403,19 +271,21 @@ ${templateInfo}
           });
 
           try {
-            console.log(`[Stream] Generating ${docKey} with retry...`);
+            console.log(`[Regenerate] Generating ${docKey}...`);
             const systemPrompt = DOCUMENT_PROMPTS[docKey];
 
-            // 재시도 로직 사용
+            if (!systemPrompt) {
+              throw new Error(`알 수 없는 문서 키: ${docKey}`);
+            }
+
             const { content, retryCount } = await generateWithRetry(
-              provider,
+              provider as AIProvider,
               apiKey,
               model,
               baseContext,
               systemPrompt,
               MAX_RETRIES,
               (attempt, error) => {
-                // 재시도 중 상태 전송
                 sendEvent(controller, encoder, {
                   type: 'progress',
                   documentKey: docKey,
@@ -429,9 +299,8 @@ ${templateInfo}
             );
 
             documents[docKey] = content;
-            console.log(`[Stream] ✅ ${docKey} generated (retries: ${retryCount})`);
+            console.log(`[Regenerate] ✅ ${docKey} regenerated (retries: ${retryCount})`);
 
-            // Send document complete event
             sendEvent(controller, encoder, {
               type: 'document',
               documentKey: docKey,
@@ -441,44 +310,31 @@ ${templateInfo}
               retryCount,
             });
 
-            // 문서 간 딜레이 (rate limit 방지)
-            await new Promise(resolve => setTimeout(resolve, BASE_DELAY_MS));
+            // 문서 간 딜레이
+            if (i < documentKeys.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
 
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            console.error(`[Stream] ❌ Error generating ${docKey} after ${MAX_RETRIES} retries:`, errorMsg);
+            console.error(`[Regenerate] ❌ Error regenerating ${docKey}:`, errorMsg);
 
-            // 모든 재시도 실패 시 fallback
-            const fallbackContent = `# ${docKey}\n\n문서 생성에 실패했습니다. 다시 시도해주세요.\n\n오류: ${errorMsg}`;
-            documents[docKey] = fallbackContent;
-
-            // Send error event for this document
             sendEvent(controller, encoder, {
               type: 'error',
               documentKey: docKey,
               error: errorMsg,
-              content: fallbackContent,
               step: i + 1,
               totalSteps,
               retryCount: MAX_RETRIES,
               maxRetries: MAX_RETRIES,
             });
-
-            // Rate limit 에러 시 추가 대기
-            if (errorMsg.includes('429') || errorMsg.includes('quota') || errorMsg.includes('rate')) {
-              await new Promise(resolve => setTimeout(resolve, 5000));
-            }
           }
         }
 
-        // Generate TODOs from todoMaster content
-        const todos = parseTodosFromMaster(documents.todoMaster || '');
-
-        // Send complete event with all documents and todos
+        // Send complete event
         sendEvent(controller, encoder, {
           type: 'complete',
           documents: documents as CoreDocuments,
-          todos,
         });
 
         controller.close();
@@ -494,11 +350,11 @@ ${templateInfo}
     });
 
   } catch (error) {
-    console.error('[Stream] Document generation error:', error);
+    console.error('[Regenerate] Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     return new Response(
-      JSON.stringify({ error: `문서 생성 실패: ${errorMessage}` }),
+      JSON.stringify({ error: `문서 재생성 실패: ${errorMessage}` }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

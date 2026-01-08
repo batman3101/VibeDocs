@@ -9,7 +9,9 @@ import type {
   PhaseProgress,
   CoreDocuments,
   DesignSystem,
+  PartialGenerationState,
 } from '@/types';
+import { STORAGE_KEYS } from '@/types';
 
 // ============================================
 // 유틸리티 함수
@@ -73,6 +75,7 @@ interface ProjectState {
   projects: Project[];
   isLoading: boolean;
   error: string | null;
+  partialGeneration: PartialGenerationState | null;
 
   // 프로젝트 액션
   setProject: (project: Project) => void;
@@ -83,6 +86,7 @@ interface ProjectState {
 
   // 문서 액션
   updateDocument: (key: keyof CoreDocuments, content: string) => void;
+  updateDocumentsBatch: (docs: Partial<CoreDocuments>) => void;
 
   // TODO 액션
   updateTodoStatus: (todoId: string, status: TodoStatus, updatedBy?: 'manual' | 'ai', confidence?: number) => void;
@@ -98,6 +102,13 @@ interface ProjectState {
   updateProjectInfo: (id: string, updates: { name?: string; description?: string }) => void;
   duplicateProject: (id: string) => void;
   updatePhaseOrder: (newOrder: string[]) => void;
+
+  // 부분 생성 상태 액션 (중간 저장용)
+  savePartialGeneration: (state: PartialGenerationState) => void;
+  getPartialGeneration: () => PartialGenerationState | null;
+  clearPartialGeneration: () => void;
+  updatePartialDocument: (key: keyof CoreDocuments, content: string) => void;
+  markDocumentFailed: (key: keyof CoreDocuments) => void;
 
   // 유틸리티 액션
   setLoading: (loading: boolean) => void;
@@ -117,6 +128,7 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
       isLoading: false,
       error: null,
+      partialGeneration: null,
 
       // 프로젝트 액션
       setProject: (project) => set({ project }),
@@ -185,6 +197,23 @@ export const useProjectStore = create<ProjectState>()(
               coreDocs: {
                 ...state.project.coreDocs,
                 [key]: content,
+              },
+              updatedAt: new Date(),
+            },
+          };
+        });
+      },
+
+      updateDocumentsBatch: (docs) => {
+        set((state) => {
+          if (!state.project) return state;
+
+          return {
+            project: {
+              ...state.project,
+              coreDocs: {
+                ...state.project.coreDocs,
+                ...docs,
               },
               updatedAt: new Date(),
             },
@@ -400,6 +429,106 @@ export const useProjectStore = create<ProjectState>()(
         });
       },
 
+      // 부분 생성 상태 액션 (중간 저장용)
+      savePartialGeneration: (partialState) => {
+        set({ partialGeneration: partialState });
+        // localStorage에도 별도로 저장 (persist 미들웨어 외에 즉시 저장)
+        try {
+          localStorage.setItem(
+            STORAGE_KEYS.PARTIAL_GENERATION,
+            JSON.stringify(partialState)
+          );
+        } catch (e) {
+          console.error('Failed to save partial generation:', e);
+        }
+      },
+
+      getPartialGeneration: () => {
+        // 먼저 상태에서 확인
+        const { partialGeneration } = get();
+        if (partialGeneration) return partialGeneration;
+
+        // localStorage에서 복구 시도
+        try {
+          const saved = localStorage.getItem(STORAGE_KEYS.PARTIAL_GENERATION);
+          if (saved) {
+            const parsed = JSON.parse(saved) as PartialGenerationState;
+            set({ partialGeneration: parsed });
+            return parsed;
+          }
+        } catch (e) {
+          console.error('Failed to load partial generation:', e);
+        }
+        return null;
+      },
+
+      clearPartialGeneration: () => {
+        set({ partialGeneration: null });
+        try {
+          localStorage.removeItem(STORAGE_KEYS.PARTIAL_GENERATION);
+        } catch (e) {
+          console.error('Failed to clear partial generation:', e);
+        }
+      },
+
+      updatePartialDocument: (key, content) => {
+        set((state) => {
+          const current = state.partialGeneration;
+          if (!current) return state;
+
+          const updated: PartialGenerationState = {
+            ...current,
+            completedDocs: {
+              ...current.completedDocs,
+              [key]: content,
+            },
+            pendingDocs: current.pendingDocs.filter(k => k !== key),
+            failedDocs: current.failedDocs.filter(k => k !== key),
+            lastUpdated: new Date(),
+          };
+
+          // localStorage에도 즉시 저장
+          try {
+            localStorage.setItem(
+              STORAGE_KEYS.PARTIAL_GENERATION,
+              JSON.stringify(updated)
+            );
+          } catch (e) {
+            console.error('Failed to update partial document:', e);
+          }
+
+          return { partialGeneration: updated };
+        });
+      },
+
+      markDocumentFailed: (key) => {
+        set((state) => {
+          const current = state.partialGeneration;
+          if (!current) return state;
+
+          const updated: PartialGenerationState = {
+            ...current,
+            pendingDocs: current.pendingDocs.filter(k => k !== key),
+            failedDocs: current.failedDocs.includes(key)
+              ? current.failedDocs
+              : [...current.failedDocs, key],
+            lastUpdated: new Date(),
+          };
+
+          // localStorage에도 즉시 저장
+          try {
+            localStorage.setItem(
+              STORAGE_KEYS.PARTIAL_GENERATION,
+              JSON.stringify(updated)
+            );
+          } catch (e) {
+            console.error('Failed to mark document failed:', e);
+          }
+
+          return { partialGeneration: updated };
+        });
+      },
+
       // 유틸리티 액션
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
@@ -411,6 +540,7 @@ export const useProjectStore = create<ProjectState>()(
       partialize: (state) => ({
         project: state.project,
         projects: state.projects,
+        partialGeneration: state.partialGeneration,
       }),
     }
   )
