@@ -70,13 +70,25 @@ export function GenerationProgress({
   const generatedDocsRef = useRef<Partial<CoreDocuments>>({ ...existingDocs });
   const failedDocsRef = useRef<(keyof CoreDocuments)[]>([]);
 
-  // Zustand 스토어
-  const {
-    savePartialGeneration,
-    updatePartialDocument,
-    markDocumentFailed,
-    clearPartialGeneration,
-  } = useProjectStore();
+  // Zustand 스토어 - 함수들을 ref로 저장하여 참조 안정성 보장
+  const storeRef = useRef(useProjectStore.getState());
+
+  // 스토어 함수들을 안정적으로 사용하기 위한 래퍼
+  const savePartialGeneration = useCallback((state: PartialGenerationState) => {
+    storeRef.current.savePartialGeneration(state);
+  }, []);
+
+  const updatePartialDocument = useCallback((key: keyof CoreDocuments, content: string) => {
+    storeRef.current.updatePartialDocument(key, content);
+  }, []);
+
+  const markDocumentFailed = useCallback((key: keyof CoreDocuments) => {
+    storeRef.current.markDocumentFailed(key);
+  }, []);
+
+  const clearPartialGeneration = useCallback(() => {
+    storeRef.current.clearPartialGeneration();
+  }, []);
 
   // 부분 생성 상태 초기화
   useEffect(() => {
@@ -126,7 +138,7 @@ export function GenerationProgress({
       markDocumentFailed(docKey);
       setHasErrors(true);
     }
-  }, [updatePartialDocument, markDocumentFailed]);
+  }, []);
 
   // 실패한 문서만 재생성
   const handleRetryFailed = useCallback(async () => {
@@ -267,11 +279,26 @@ export function GenerationProgress({
     }
 
     clearPartialGeneration();
-  }, [documentStates, onPartialSave, clearPartialGeneration]);
+  }, [documentStates]);
+
+  // 콜백 함수들을 ref로 저장하여 의존성 문제 방지
+  const onCompleteRef = useRef(onComplete);
+  const onErrorRef = useRef(onError);
+  const onPartialSaveRef = useRef(onPartialSave);
+
+  // ref 업데이트
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+    onErrorRef.current = onError;
+    onPartialSaveRef.current = onPartialSave;
+  }, [onComplete, onError, onPartialSave]);
 
   useEffect(() => {
     const abortController = new AbortController();
     let hasCompleted = false;
+
+    console.log('[Stream] useEffect triggered, starting generation...');
+    console.log('[Stream] Props:', { apiKey: apiKey ? '***' : 'missing', idea, appType, template, provider, model });
 
     async function startGeneration() {
       try {
@@ -282,6 +309,8 @@ export function GenerationProgress({
           ...skipDocuments,
           ...Object.keys(existingDocs) as (keyof CoreDocuments)[]
         ];
+
+        console.log('[Stream] Starting API call with docsToSkip:', docsToSkip);
 
         const response = await fetch('/api/generate-documents-stream', {
           method: 'POST',
@@ -390,15 +419,14 @@ export function GenerationProgress({
                         ...eventData.documents,
                       } as CoreDocuments;
 
-                      // 에러가 있는지 확인
-                      const hasAnyErrors = documentStates.some(d => d.status === 'error') ||
-                        failedDocsRef.current.length > 0;
+                      // 에러가 있는지 확인 - ref에서 확인
+                      const hasAnyErrors = failedDocsRef.current.length > 0;
 
                       if (hasAnyErrors) {
                         setHasErrors(true);
                         // 부분 저장 콜백 호출
-                        if (onPartialSave) {
-                          onPartialSave(finalDocs, failedDocsRef.current);
+                        if (onPartialSaveRef.current) {
+                          onPartialSaveRef.current(finalDocs, failedDocsRef.current);
                         }
                       } else {
                         // 모든 문서 성공 - 완료 처리
@@ -417,7 +445,7 @@ export function GenerationProgress({
                         }));
 
                         setTimeout(() => {
-                          onComplete(finalDocs, todos);
+                          onCompleteRef.current(finalDocs, todos);
                         }, 500);
                       }
                     }
@@ -437,7 +465,7 @@ export function GenerationProgress({
 
         console.error('[Stream] Generation error:', error);
         const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-        onError(errorMessage);
+        onErrorRef.current(errorMessage);
       } finally {
         setIsConnected(false);
       }
@@ -448,7 +476,8 @@ export function GenerationProgress({
     return () => {
       abortController.abort();
     };
-  }, [apiKey, idea, appType, template, provider, model, skipDocuments, existingDocs, onComplete, onError, updateDocumentStatus, clearPartialGeneration, onPartialSave]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getStatusIcon = (status: DocumentStatus, index: number, retryCount?: number) => {
     switch (status) {

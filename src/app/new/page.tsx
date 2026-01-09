@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import type { AppType, TemplateType, CoreDocuments, TodoItem } from '@/types';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { toast } from 'sonner';
-import { DOCUMENT_NAMES, DOCUMENT_TITLES } from '@/types';
+import { DOCUMENT_NAMES } from '@/types';
 
 type Step = 'input' | 'generating' | 'preview';
 
@@ -38,15 +38,11 @@ export default function NewProjectPage() {
   const [generatedTodos, setGeneratedTodos] = useState<TodoItem[]>([]);
   const [failedDocs, setFailedDocs] = useState<(keyof CoreDocuments)[]>([]);
   const [existingDocs, setExistingDocs] = useState<Partial<CoreDocuments>>({});
-  const [hasPartialGeneration, setHasPartialGeneration] = useState(false);
-
-  // 미완료 생성 상태 확인
-  useEffect(() => {
+  // 미완료 생성 상태 확인 - 초기 렌더링 시 한 번만 계산
+  const [hasPartialGeneration, setHasPartialGeneration] = useState(() => {
     const partial = getPartialGeneration();
-    if (partial && Object.keys(partial.completedDocs).length > 0) {
-      setHasPartialGeneration(true);
-    }
-  }, [getPartialGeneration]);
+    return partial && Object.keys(partial.completedDocs).length > 0;
+  });
 
   const handleIdeaSubmit = async (idea: string, appType: AppType, template?: TemplateType, projectName?: string) => {
     if (!hasApiKey || !apiKey) {
